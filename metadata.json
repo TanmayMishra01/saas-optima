@@ -1,0 +1,6 @@
+{
+  "name": "SaaS-Optima",
+  "description": "Revolutionary B2B SaaS Subscription and Expense Management Hub featuring the autonomous AI SaaS Auditor, real-time analytics, and secure multi-tenant architecture.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
