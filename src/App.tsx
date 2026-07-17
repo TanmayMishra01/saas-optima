@@ -5,8 +5,9 @@ import ChartView from './components/ChartView';
 import SaaSAuditor from './components/SaaSAuditor';
 import SubscriptionModal from './components/SubscriptionModal';
 import DbViewer from './components/DbViewer';
-import { dbLocal } from './lib/supabaseClient';
+import { dbLocal, supabase } from './lib/supabaseClient';
 import { Subscription } from './types';
+import Auth from './components/Auth';
 import {
   CreditCard,
   Plus,
@@ -19,7 +20,10 @@ import {
   HelpCircle,
   Briefcase,
   Layers,
-  ArrowRight
+  ArrowRight,
+  LogOut,
+  ChevronDown,
+  Loader2
 } from 'lucide-react';
 
 // Highly-polished design presets for the user to choose from
@@ -132,6 +136,11 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  // Supabase Auth States
+  const [user, setUser] = useState<any>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
 
   // Dynamic Theme Selection State (restored from storage)
   const [theme, setTheme] = useState<'slate' | 'midnight' | 'nordic' | 'warm' | 'brutalist' | 'cyberneon'>(() => {
@@ -143,13 +152,54 @@ export default function App() {
     localStorage.setItem('optima_theme', theme);
   }, [theme]);
 
-  // Active Tenant Configuration (Demo Context)
+  // Handle checking/listening to Supabase session
+  useEffect(() => {
+    let unsubscribeFn: (() => void) | null = null;
+
+    supabase.auth.getSession()
+      .then(({ data: { session } }) => {
+        setUser(session?.user ?? null);
+        setAuthLoading(false);
+      })
+      .catch((err) => {
+        console.error("Error fetching Supabase session:", err);
+        setAuthLoading(false);
+      });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      setAuthLoading(false);
+    });
+    
+    if (subscription) {
+      unsubscribeFn = () => subscription.unsubscribe();
+    }
+
+    return () => {
+      if (unsubscribeFn) {
+        unsubscribeFn();
+      }
+    };
+  }, []);
+
+  // Logout handler
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.error("Error signing out from Supabase:", e);
+    }
+    setUser(null);
+    setIsProfileDropdownOpen(false);
+  };
+
+  // Active Tenant Configuration (Demo Context dynamically linked to logged-in user)
   const activeOrg = {
     id: 'org_enterprise_optima',
     name: 'Optima Enterprises Inc.',
   };
   const activeUser = {
-    email: 'mishratanmay225@gmail.com',
+    email: user?.email || 'mishratanmay225@gmail.com',
   };
 
   // Synchronize state from Local Storage local client database
@@ -245,6 +295,37 @@ export default function App() {
 
   const cfg = themeConfigs[theme];
 
+  if (authLoading) {
+    const loadingCfg = themeConfigs[theme];
+    return (
+      <div className={`min-h-screen flex flex-col items-center justify-center ${loadingCfg.bgMain}`}>
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className={`h-12 w-12 animate-spin ${
+            theme === 'cyberneon' ? 'text-cyan-400 drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]' : 'text-emerald-500'
+          }`} />
+          <p className={`text-sm font-mono tracking-widest uppercase ${
+            theme === 'midnight' ? 'text-teal-400' : theme === 'cyberneon' ? 'text-cyan-400 font-bold' : 'text-slate-500'
+          }`}>
+            Initializing Secure Auth Shield...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Auth theme={theme} onAuthSuccess={(usr) => setUser(usr)} />;
+  }
+
+  const dropdownStyles = {
+    slate: 'bg-white border-slate-200 text-slate-800 shadow-xl',
+    midnight: 'bg-[#0c1222] border-slate-800 text-slate-100 shadow-2xl',
+    nordic: 'bg-white border-blue-100 text-slate-800 shadow-xl',
+    warm: 'bg-[#fbf9f5] border-[#ebdcd0] text-[#2e2620] shadow-lg',
+    brutalist: 'bg-white border-3 border-black text-black rounded-none shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]',
+    cyberneon: 'bg-[#090514] border border-fuchsia-500/30 text-white shadow-[0_0_20px_rgba(217,70,239,0.25)]'
+  }[theme];
+
   return (
     <div className={`flex h-screen ${cfg.bgMain} overflow-hidden font-sans transition-colors duration-200`}>
       {/* Navigation Sidebar */}
@@ -285,71 +366,127 @@ export default function App() {
             </div>
           </div>
 
-          {/* Premium UI Theme Presets Panel */}
-          <div className="flex items-center gap-2.5">
-            <span className={`text-[10px] font-mono opacity-70 flex items-center gap-1 font-bold ${theme === 'brutalist' ? 'text-black uppercase' : ''}`}>
-              🎨 Change Design:
-            </span>
-            <div className={`flex flex-wrap items-center gap-1 p-1 rounded-lg ${
-              theme === 'midnight' 
-                ? 'bg-slate-900/60 border border-slate-800' 
-                : theme === 'warm' 
-                ? 'bg-[#efeae0] border border-[#ebdcd0]' 
-                : theme === 'brutalist' 
-                ? 'bg-zinc-200 border-2 border-black' 
-                : theme === 'cyberneon'
-                ? 'bg-[#090514] border border-fuchsia-500/20'
-                : 'bg-slate-100 border border-slate-200/60'
-            }`}>
-              {Object.keys(themeConfigs).map((tId) => {
-                const isActive = theme === tId;
-                
-                const dotColor = {
-                  slate: 'bg-slate-500 border-slate-400',
-                  midnight: 'bg-teal-400 border-teal-300',
-                  nordic: 'bg-indigo-600 border-indigo-400',
-                  warm: 'bg-[#c2410c] border-[#f0c2a5]',
-                  brutalist: 'bg-yellow-400 border-black',
-                  cyberneon: 'bg-fuchsia-500 border-cyan-400 animate-pulse'
-                }[tId as keyof typeof themeConfigs];
+          {/* Premium UI Theme Presets Panel & Profile Dropdown */}
+          <div className="flex flex-wrap items-center gap-4.5">
+            <div className="flex items-center gap-2.5">
+              <span className={`text-[10px] font-mono opacity-70 flex items-center gap-1 font-bold ${theme === 'brutalist' ? 'text-black uppercase' : ''}`}>
+                🎨 Change Design:
+              </span>
+              <div className={`flex flex-wrap items-center gap-1 p-1 rounded-lg ${
+                theme === 'midnight' 
+                  ? 'bg-slate-900/60 border border-slate-800' 
+                  : theme === 'warm' 
+                  ? 'bg-[#efeae0] border border-[#ebdcd0]' 
+                  : theme === 'brutalist' 
+                  ? 'bg-zinc-200 border-2 border-black' 
+                  : theme === 'cyberneon'
+                  ? 'bg-[#090514] border border-fuchsia-500/20'
+                  : 'bg-slate-100 border border-slate-200/60'
+              }`}>
+                {Object.keys(themeConfigs).map((tId) => {
+                  const isActive = theme === tId;
+                  
+                  const dotColor = {
+                    slate: 'bg-slate-500 border-slate-400',
+                    midnight: 'bg-teal-400 border-teal-300',
+                    nordic: 'bg-indigo-600 border-indigo-400',
+                    warm: 'bg-[#c2410c] border-[#f0c2a5]',
+                    brutalist: 'bg-yellow-400 border-black',
+                    cyberneon: 'bg-fuchsia-500 border-cyan-400 animate-pulse'
+                  }[tId as keyof typeof themeConfigs];
 
-                const labels = {
-                  slate: 'Classic Slate',
-                  midnight: 'Midnight Cosmic',
-                  nordic: 'Nordic Frost',
-                  warm: 'Warm Sepia',
-                  brutalist: 'Bold Brutalist',
-                  cyberneon: 'Cyber Neon'
-                }[tId as keyof typeof themeConfigs];
+                  const labels = {
+                    slate: 'Classic Slate',
+                    midnight: 'Midnight Cosmic',
+                    nordic: 'Nordic Frost',
+                    warm: 'Warm Sepia',
+                    brutalist: 'Bold Brutalist',
+                    cyberneon: 'Cyber Neon'
+                  }[tId as keyof typeof themeConfigs];
 
-                return (
-                  <button
-                    key={tId}
-                    onClick={() => setTheme(tId as any)}
-                    title={`Switch to ${labels}`}
-                    className={`px-2.5 py-1 text-[10.5px] font-medium font-sans rounded-md transition-all flex items-center gap-1.5 cursor-pointer ${
-                      isActive
-                        ? theme === 'brutalist'
-                          ? 'bg-black text-white font-black rounded-none border border-black'
+                  return (
+                    <button
+                      key={tId}
+                      onClick={() => setTheme(tId as any)}
+                      title={`Switch to ${labels}`}
+                      className={`px-2.5 py-1 text-[10.5px] font-medium font-sans rounded-md transition-all flex items-center gap-1.5 cursor-pointer ${
+                        isActive
+                          ? theme === 'brutalist'
+                            ? 'bg-black text-white font-black rounded-none border border-black'
+                            : theme === 'cyberneon'
+                            ? 'bg-cyan-400 text-black font-extrabold shadow-[0_0_8px_rgba(34,211,238,0.4)]'
+                            : 'bg-white text-slate-900 shadow-sm border border-slate-200 font-bold'
+                          : theme === 'midnight'
+                          ? 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                          : theme === 'warm'
+                          ? 'text-[#7a6d61] hover:text-[#2e2620] hover:bg-white/40'
+                          : theme === 'brutalist'
+                          ? 'text-zinc-800 hover:bg-zinc-300 font-bold rounded-none'
                           : theme === 'cyberneon'
-                          ? 'bg-cyan-400 text-black font-extrabold shadow-[0_0_8px_rgba(34,211,238,0.4)]'
-                          : 'bg-white text-slate-900 shadow-sm border border-slate-200 font-bold'
-                        : theme === 'midnight'
-                        ? 'text-slate-400 hover:text-white hover:bg-slate-800/50'
-                        : theme === 'warm'
-                        ? 'text-[#7a6d61] hover:text-[#2e2620] hover:bg-white/40'
-                        : theme === 'brutalist'
-                        ? 'text-zinc-800 hover:bg-zinc-300 font-bold rounded-none'
-                        : theme === 'cyberneon'
-                        ? 'text-cyan-400 hover:text-fuchsia-400 hover:bg-fuchsia-500/10'
-                        : 'text-slate-500 hover:text-slate-800 hover:bg-white/40'
-                    }`}
-                  >
-                    <span className={`h-2 w-2 rounded-full border ${dotColor}`}></span>
-                    <span className="text-[10px]">{labels}</span>
-                  </button>
-                );
-              })}
+                          ? 'text-cyan-400 hover:text-fuchsia-400 hover:bg-fuchsia-500/10'
+                          : 'text-slate-500 hover:text-slate-800 hover:bg-white/40'
+                      }`}
+                    >
+                      <span className={`h-2 w-2 rounded-full border ${dotColor}`}></span>
+                      <span className="text-[10px]">{labels}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className={`h-6 w-px ${
+              theme === 'midnight' ? 'bg-slate-800' : theme === 'warm' ? 'bg-[#ebdcd0]' : theme === 'brutalist' ? 'bg-black w-0.5' : theme === 'cyberneon' ? 'bg-fuchsia-500/20' : 'bg-slate-200'
+            }`} />
+
+            {/* Profile Dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
+                className={`flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all cursor-pointer ${
+                  theme === 'midnight'
+                    ? 'bg-slate-900/60 border-slate-800 text-slate-200 hover:bg-slate-800'
+                    : theme === 'warm'
+                    ? 'bg-[#efeae0] border-[#ebdcd0] text-[#2e2620] hover:bg-[#ebdcd0]'
+                    : theme === 'brutalist'
+                    ? 'bg-white border-2 border-black rounded-none font-bold shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[-1px] hover:translate-y-[-1px]'
+                    : theme === 'cyberneon'
+                    ? 'bg-[#090514] border-fuchsia-500/20 text-cyan-400 font-bold hover:border-fuchsia-500/50 shadow-[0_0_10px_rgba(34,211,238,0.15)]'
+                    : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                <div className={`h-5 w-5 rounded-full flex items-center justify-center font-bold text-[10px] uppercase ${
+                  theme === 'brutalist' ? 'bg-[#facc15] text-black border border-black rounded-none' : 'bg-emerald-500 text-slate-950'
+                }`}>
+                  {activeUser.email.substring(0, 2)}
+                </div>
+                <span className="max-w-[120px] truncate">{activeUser.email}</span>
+                <ChevronDown className="h-3.5 w-3.5 opacity-60" />
+              </button>
+
+              {isProfileDropdownOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setIsProfileDropdownOpen(false)} />
+                  <div className={`absolute right-0 mt-2 w-56 rounded-xl border p-4 z-50 text-left ${dropdownStyles}`}>
+                    <div className="space-y-1 pb-3 border-b mb-3 border-slate-100 dark:border-slate-800/60">
+                      <p className="text-[10px] font-mono uppercase opacity-50 font-bold tracking-wider">Logged in as</p>
+                      <p className="font-bold text-xs truncate">{activeUser.email}</p>
+                      <p className={`text-[10px] font-medium ${
+                        theme === 'cyberneon' ? 'text-cyan-400 font-bold' : theme === 'midnight' ? 'text-teal-400' : 'text-emerald-600'
+                      }`}>Finance Architect</p>
+                    </div>
+                    <div className="space-y-1">
+                      <button
+                        onClick={handleLogout}
+                        className="w-full flex items-center gap-2 px-2.5 py-2 text-xs font-semibold text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 rounded-lg transition-all cursor-pointer"
+                      >
+                        <LogOut className="h-4 w-4" />
+                        <span>Log Out Session</span>
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>

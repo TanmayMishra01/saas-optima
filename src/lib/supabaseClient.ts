@@ -2,8 +2,24 @@ import { createClient } from '@supabase/supabase-js';
 import { Subscription, Organization, Profile } from '../types';
 
 // Safe retrieval of credentials
-const supabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '';
+function sanitizeSupabaseUrl(url: string): string {
+  if (!url) return '';
+  let sanitized = url.trim();
+  if (sanitized.endsWith('/')) {
+    sanitized = sanitized.slice(0, -1);
+  }
+  if (sanitized.endsWith('/rest/v1')) {
+    sanitized = sanitized.slice(0, -8);
+  }
+  if (sanitized.endsWith('/')) {
+    sanitized = sanitized.slice(0, -1);
+  }
+  return sanitized;
+}
+
+const rawSupabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL || '';
+const supabaseUrl = sanitizeSupabaseUrl(rawSupabaseUrl);
+const supabaseAnonKey = ((import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '').trim();
 
 // Initialize Supabase client. Using placeholder values if not configured to prevent crash on startup.
 export const supabase = createClient(
@@ -236,10 +252,22 @@ export const dbLocal = new LocalDatabase();
 
 // Supabase Connection Settings Info & Verification
 export const getSupabaseConfig = () => {
-  const url = (import.meta as any).env?.VITE_SUPABASE_URL || '';
-  const anonKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '';
+  const rawUrl = (import.meta as any).env?.VITE_SUPABASE_URL || '';
+  const url = sanitizeSupabaseUrl(rawUrl);
+  const anonKey = ((import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '').trim();
+  
+  // Resilient check to verify if a valid, real Supabase instance is configured
+  const isConfigured = !!(
+    url && 
+    anonKey && 
+    url.startsWith('https://') && 
+    !url.includes('placeholder-project') && 
+    !url.includes('YOUR_SUPABASE') &&
+    !url.includes('example.com')
+  );
+
   return {
-    isConfigured: !!(url && anonKey),
+    isConfigured,
     url,
     anonKey
   };

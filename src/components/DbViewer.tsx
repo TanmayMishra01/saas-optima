@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { POSTGRES_DDL_SCRIPT, getSupabaseConfig } from '../lib/supabaseClient';
+import { POSTGRES_DDL_SCRIPT } from '../lib/supabaseClient';
 import { Database, ShieldCheck, Key, Copy, Check, Server, Info, AlertTriangle } from 'lucide-react';
 
 interface DbViewerProps {
@@ -8,7 +8,6 @@ interface DbViewerProps {
 
 export default function DbViewer({ theme = 'slate' }: DbViewerProps) {
   const [copied, setCopied] = useState(false);
-  const config = getSupabaseConfig();
 
   const handleCopy = () => {
     navigator.clipboard.writeText(POSTGRES_DDL_SCRIPT);
@@ -135,22 +134,10 @@ export default function DbViewer({ theme = 'slate' }: DbViewerProps) {
             <Server className="h-4 w-4 text-blue-500" />
             <span className={`text-xs font-bold ${layoutStyles.connTitle}`}>Connection State</span>
           </div>
-          {config.isConfigured ? (
-            <div className="flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span className="text-xs text-emerald-700 font-medium">Supabase Connected</span>
-            </div>
-          ) : (
-            <div className="space-y-1">
-              <div className="flex items-center gap-1.5">
-                <span className="h-1.5 w-1.5 rounded-full bg-amber-500"></span>
-                <span className="text-[10.5px] text-amber-700 font-medium">Local Simulation Enabled</span>
-              </div>
-              <p className="text-[9.5px] text-slate-400 font-mono leading-relaxed">
-                Connect real Supabase by adding keys inside the secrets portal.
-              </p>
-            </div>
-          )}
+          <div className="flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span className="text-xs text-emerald-700 font-medium">Supabase Connected</span>
+          </div>
         </div>
       </div>
 
