@@ -1,4 +1,16 @@
+import { createClient } from '@supabase/supabase-js';
 import { Subscription, Organization, Profile } from '../types';
+
+// Safe retrieval of credentials
+const supabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL || '';
+const supabaseAnonKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '';
+
+// Initialize Supabase client. Using placeholder values if not configured to prevent crash on startup.
+export const supabase = createClient(
+  supabaseUrl || 'https://placeholder-project.supabase.co',
+  supabaseAnonKey || 'placeholder-key'
+);
+
 
 // Mock/Fallback database for standard preview when Supabase is not yet configured.
 const INITIAL_ORGS: Organization[] = [
